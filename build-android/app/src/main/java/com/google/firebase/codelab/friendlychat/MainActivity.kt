@@ -16,58 +16,73 @@
 package com.google.firebase.codelab.friendlychat
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.ProgressBar
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.firebase.ui.auth.AuthUI
 import com.firebase.ui.database.FirebaseRecyclerOptions
+import com.firebase.ui.database.SnapshotParser
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.codelab.friendlychat.databinding.ActivityMainBinding
 import com.google.firebase.codelab.friendlychat.model.FriendlyMessage
-import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
-import com.google.firebase.storage.StorageReference
-import com.google.firebase.storage.ktx.storage
+import dev.leonardpark.emoji.EmojiManager
+import dev.leonardpark.emoji.EmojiPopup
+import dev.leonardpark.emoji.emoji.Emoji
+import dev.leonardpark.emoji.emojicompat.EmojiImageView
+import dev.leonardpark.emoji.google.GoogleEmojiProvider
+import dev.leonardpark.emoji.listeners.OnEmojiBackspaceClickListener
+import dev.leonardpark.emoji.listeners.OnEmojiClickListener
+import dev.leonardpark.emoji.listeners.OnEmojiPopupDismissListener
+import dev.leonardpark.emoji.listeners.OnEmojiPopupShownListener
+import dev.leonardpark.emoji.listeners.OnSoftKeyboardCloseListener
+import dev.leonardpark.emoji.listeners.OnSoftKeyboardOpenListener
 
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var manager: LinearLayoutManager
+    private lateinit var rootView: ViewGroup
+    private var emojiPopup: EmojiPopup? = null
+    lateinit var emojiButton: ImageView
 
     // Firebase instance variables
     private lateinit var auth: FirebaseAuth
     private lateinit var db: FirebaseDatabase
     private lateinit var adapter: FriendlyMessageAdapter
 
-    private val openDocument = registerForActivityResult(MyOpenDocumentContract()) { uri ->
-        uri?.let { onImageSelected(it) }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        EmojiManager.install(GoogleEmojiProvider())
 
         // This codelab uses View Binding
         // See: https://developer.android.com/topic/libraries/view-binding
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        rootView = binding.mainActivityRootview
+        emojiButton = binding.mainActivityEmoji
 
         // When running in debug mode, connect to the Firebase Emulator Suite
         // "10.0.2.2" is a special value which allows the Android emulator to
         // connect to "localhost" on the host computer. The port values are
         // defined in the firebase.json file.
-        if (BuildConfig.DEBUG) {
-            Firebase.database.useEmulator("10.0.2.2", 9000)
-            Firebase.auth.useEmulator("10.0.2.2", 9099)
-            Firebase.storage.useEmulator("10.0.2.2", 9199)
-        }
+//        if (BuildConfig.DEBUG) {
+//            Firebase.database.useEmulator("192.168.0.113", 9000)
+//            Firebase.auth.useEmulator("192.168.0.113", 9099)
+//            Firebase.storage.useEmulator("192.168.0.113", 9199)
+//        }
 
         // Initialize Firebase Auth and check if the user is signed in
         auth = Firebase.auth
@@ -84,8 +99,16 @@ class MainActivity : AppCompatActivity() {
 
         // The FirebaseRecyclerAdapter class and options come from the FirebaseUI library
         // See: https://github.com/firebase/FirebaseUI-Android
+        val snapshotParser: SnapshotParser<FriendlyMessage?> =
+            SnapshotParser<FriendlyMessage?> { snapshot: DataSnapshot ->
+                val chat = snapshot.getValue(FriendlyMessage::class.java)
+                chat?.let {
+                    it.uid = snapshot.key
+                }
+                chat!!
+            }
         val options = FirebaseRecyclerOptions.Builder<FriendlyMessage>()
-            .setQuery(messagesRef, FriendlyMessage::class.java)
+            .setQuery(messagesRef, snapshotParser)
             .build()
         adapter = FriendlyMessageAdapter(options, getUserName())
         binding.progressBar.visibility = ProgressBar.INVISIBLE
@@ -93,6 +116,13 @@ class MainActivity : AppCompatActivity() {
         manager.stackFromEnd = true
         binding.messageRecyclerView.layoutManager = manager
         binding.messageRecyclerView.adapter = adapter
+
+        adapter.onDeleteClick = {
+            if(it.uid != null) {
+                val message = messagesRef.child(it.uid!!)
+                message.removeValue()
+            }
+        }
 
         // Scroll down when a new message arrives
         // See MyScrollToBottomObserver for details
@@ -117,9 +147,50 @@ class MainActivity : AppCompatActivity() {
         }
 
         // When the image button is clicked, launch the image picker
-        binding.addMessageImageView.setOnClickListener {
-            openDocument.launch(arrayOf("image/*"))
+        emojiButton.setOnClickListener {
+            emojiPopup!!.toggle()
         }
+
+        setUpEmojiPopup()
+    }
+
+    private fun setUpEmojiPopup() {
+        emojiPopup = EmojiPopup.Builder.fromRootView(rootView)
+            .setOnEmojiBackspaceClickListener(object : OnEmojiBackspaceClickListener {
+                override fun onEmojiBackspaceClick(v: View) {
+                    Log.d(TAG, "Clicked on Backspace")
+                }
+            })
+            .setOnEmojiClickListener(object : OnEmojiClickListener {
+                override fun onEmojiClick(imageView: EmojiImageView, emoji: Emoji) {
+                    Log.d(TAG, "Clicked on emoji")
+                }
+            })
+            .setOnEmojiPopupShownListener(object : OnEmojiPopupShownListener {
+                override fun onEmojiPopupShown() {
+                    emojiButton.setImageResource(R.drawable.ic_keyboard)
+                }
+            })
+            .setOnSoftKeyboardOpenListener(object : OnSoftKeyboardOpenListener {
+                override fun onKeyboardOpen(keyBoardHeight: Int) {
+                    Log.d(
+                        TAG, "Opened soft keyboard"
+                    )
+                }
+            })
+            .setOnEmojiPopupDismissListener(object : OnEmojiPopupDismissListener {
+                override fun onEmojiPopupDismiss() {
+                    emojiButton.setImageResource(R.drawable.outline_emoji_emotions_24)
+                }
+            })
+            .setOnSoftKeyboardCloseListener(object : OnSoftKeyboardCloseListener {
+                override fun onKeyboardClose() {
+                    Log.d(TAG, "Closed soft keyboard")
+                }
+            })
+            .build(binding.messageEditText)
+
+
     }
 
     public override fun onStart() {
@@ -159,60 +230,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun onImageSelected(uri: Uri) {
-        Log.d(TAG, "Uri: $uri")
-        val user = auth.currentUser
-        val tempMessage = FriendlyMessage(null, getUserName(), getPhotoUrl(), LOADING_IMAGE_URL)
-        db.reference
-                .child(MESSAGES_CHILD)
-                .push()
-                .setValue(
-                        tempMessage,
-                        DatabaseReference.CompletionListener { databaseError, databaseReference ->
-                            if (databaseError != null) {
-                                Log.w(
-                                        TAG, "Unable to write message to database.",
-                                        databaseError.toException()
-                                )
-                                return@CompletionListener
-                            }
-
-                            // Build a StorageReference and then upload the file
-                            val key = databaseReference.key
-                            val storageReference = Firebase.storage
-                                    .getReference(user!!.uid)
-                                    .child(key!!)
-                                    .child(uri.lastPathSegment!!)
-                            putImageInStorage(storageReference, uri, key)
-                        })
-    }
-
-    private fun putImageInStorage(storageReference: StorageReference, uri: Uri, key: String?) {
-        // First upload the image to Cloud Storage
-        storageReference.putFile(uri)
-            .addOnSuccessListener(
-                this
-            ) { taskSnapshot -> // After the image loads, get a public downloadUrl for the image
-                // and add it to the message.
-                taskSnapshot.metadata!!.reference!!.downloadUrl
-                    .addOnSuccessListener { uri ->
-                        val friendlyMessage =
-                            FriendlyMessage(null, getUserName(), getPhotoUrl(), uri.toString())
-                        db.reference
-                            .child(MESSAGES_CHILD)
-                            .child(key!!)
-                            .setValue(friendlyMessage)
-                    }
-            }
-            .addOnFailureListener(this) { e ->
-                Log.w(
-                    TAG,
-                    "Image upload task was unsuccessful.",
-                    e
-                )
-            }
-    }
-
     private fun signOut() {
         AuthUI.getInstance().signOut(this)
         startActivity(Intent(this, SignInActivity::class.java))
@@ -235,6 +252,6 @@ class MainActivity : AppCompatActivity() {
         private const val TAG = "MainActivity"
         const val MESSAGES_CHILD = "messages"
         const val ANONYMOUS = "anonymous"
-        private const val LOADING_IMAGE_URL = "https://www.google.com/images/spin-32.gif"
+
     }
 }

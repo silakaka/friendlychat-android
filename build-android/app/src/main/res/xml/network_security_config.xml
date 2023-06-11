@@ -6,5 +6,6 @@
             See: https://developer.android.com/training/articles/security-config#CleartextTrafficPermitted
         -->
         <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">192.168.0.113</domain>
     </domain-config>
 </network-security-config>

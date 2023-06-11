@@ -13,7 +13,7 @@ android {
         minSdk = 21
         targetSdk = 33
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -54,6 +54,10 @@ dependencies {
     implementation("androidx.legacy:legacy-support-v4:1.0.0")
     implementation("androidx.media:media:1.6.0")
     implementation("androidx.core:core-ktx:1.10.1")
+
+    // Emoji Keyboard
+    implementation(files("libs/emoji-release.aar"))
+    implementation(files("libs/emoji-google-release.aar"))
 
     // Google
     implementation("com.google.android.gms:play-services-auth:20.5.0")

@@ -3,7 +3,9 @@
     xmlns:ads="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
+    android:background="#000000"
     android:layout_height="match_parent"
+    android:id="@+id/main_activity_rootview"
     tools:context="com.google.firebase.codelab.friendlychat.MainActivity">
 
     <LinearLayout
@@ -16,13 +18,13 @@
         android:paddingHorizontal="10dp">
 
         <ImageView
-            android:id="@+id/addMessageImageView"
+            android:id="@+id/main_activity_emoji"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:layout_gravity="center"
-            ads:srcCompat="@drawable/outline_add_photo_alternate_24" />
+            ads:srcCompat="@drawable/outline_emoji_emotions_24" />
 
-        <EditText
+        <dev.leonardpark.emoji.emojicompat.EmojiEditText
             android:id="@+id/messageEditText"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -58,5 +60,5 @@
         android:layout_height="match_parent"
         android:layout_above="@+id/linearLayout"
         android:background="@android:color/white"
-        android:paddingHorizontal="16dp" />
+        android:paddingHorizontal="8dp" />
 </RelativeLayout>

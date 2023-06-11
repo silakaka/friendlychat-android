@@ -15,21 +15,27 @@
  */
 package com.google.firebase.codelab.friendlychat
 
+import android.annotation.SuppressLint
 import android.graphics.Color
 import android.util.Log
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.recyclerview.widget.RecyclerView.*
+import androidx.recyclerview.widget.RecyclerView.ViewHolder
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.bitmap.CircleCrop
 import com.firebase.ui.database.FirebaseRecyclerAdapter
 import com.firebase.ui.database.FirebaseRecyclerOptions
+import com.google.firebase.auth.ktx.auth
 import com.google.firebase.codelab.friendlychat.MainActivity.Companion.ANONYMOUS
 import com.google.firebase.codelab.friendlychat.databinding.ImageMessageBinding
 import com.google.firebase.codelab.friendlychat.databinding.MessageBinding
 import com.google.firebase.codelab.friendlychat.model.FriendlyMessage
+import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.storage.ktx.storage
 
@@ -39,6 +45,8 @@ class FriendlyMessageAdapter(
     private val options: FirebaseRecyclerOptions<FriendlyMessage>,
     private val currentUserName: String?
 ) : FirebaseRecyclerAdapter<FriendlyMessage, ViewHolder>(options) {
+
+    var onDeleteClick: ((FriendlyMessage) -> Unit)? = null
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val inflater = LayoutInflater.from(parent.context)
@@ -66,25 +74,41 @@ class FriendlyMessageAdapter(
     }
 
     inner class MessageViewHolder(private val binding: MessageBinding) : ViewHolder(binding.root) {
+        @SuppressLint("NotifyDataSetChanged")
         fun bind(item: FriendlyMessage) {
             binding.messageTextView.text = item.text
             setTextColor(item.name, binding.messageTextView)
+            setDeleteButtonVisibility(item.name, binding.messageDeleteButton)
 
             binding.messengerTextView.text = item.name ?: ANONYMOUS
+
             if (item.photoUrl != null) {
                 loadImageIntoView(binding.messengerImageView, item.photoUrl)
             } else {
                 binding.messengerImageView.setImageResource(R.drawable.ic_account_circle_black_36dp)
+            }
+
+            binding.messageDeleteButton.setOnClickListener {
+                onDeleteClick?.invoke(item)
             }
         }
 
         private fun setTextColor(userName: String?, textView: TextView) {
             if (userName != ANONYMOUS && currentUserName == userName && userName != null) {
                 textView.setBackgroundResource(R.drawable.rounded_message_blue)
-                textView.setTextColor(Color.WHITE)
+                textView.setTextColor(Color.BLACK)
+
             } else {
                 textView.setBackgroundResource(R.drawable.rounded_message_gray)
                 textView.setTextColor(Color.BLACK)
+            }
+        }
+
+        private fun setDeleteButtonVisibility(userName: String?, btn: ImageButton) {
+            if (userName != ANONYMOUS && currentUserName == userName && userName != null) {
+                btn.visibility = View.VISIBLE
+            } else {
+                btn.visibility = View.INVISIBLE
             }
         }
     }
